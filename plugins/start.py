@@ -17,7 +17,7 @@ HELP_TEXT = (
     "<b>How it works</b>\n\n"
     "<b>1.</b> Type the name of what you want — <i>frieren 1080p</i>, <i>s02e04</i>, whatever you remember.\n"
     "<b>2.</b> Matches come back as a numbered list.\n"
-    "<b>3.</b> Tap a number and the file lands in this chat.\n\n"
+    "<b>3.</b> Tap a result and the file lands in this chat.\n\n"
     "<b>Searching inside a group</b>\n"
     "Add me to the group and search the same way. I only answer when a search is plausible, so I don't spam.\n\n"
     "<b>Inline mode</b>\n"
@@ -29,22 +29,20 @@ HELP_TEXT = (
 async def start(client: Client, msg: Message):
     if await database.is_banned(msg.from_user.id):
         return await msg.reply("<b>You're banned.</b> Ask an admin to unban you.")
-
     await database.add_user(msg.from_user.id, msg.from_user.first_name or "")
-
     args = msg.text.split(maxsplit=1)
     payload = args[1].strip() if len(args) > 1 else ""
-
     kb = await fsub_keyboard(client, msg.from_user.id)
     if kb:
         return await msg.reply("<b>Join to continue</b>", reply_markup=kb)
-
     if payload.startswith("file_"):
         from plugins.search import deliver
         return await deliver(client, msg, payload[5:])
-
-    await msg.reply_photo(Config.START_PIC, caption=START_TEXT, reply_markup=start_keyboard()) \
-        if Config.START_PIC else await msg.reply(START_TEXT, reply_markup=start_keyboard())
+    photo = await database.get_setting("start_pic", Config.START_PIC)
+    if photo:
+        await msg.reply_photo(photo, caption=START_TEXT, reply_markup=start_keyboard())
+    else:
+        await msg.reply(START_TEXT, reply_markup=start_keyboard())
 
 
 @Client.on_callback_query(filters.regex("^(help|fsub|noop|close)$"))
