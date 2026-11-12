@@ -21,7 +21,8 @@ class Config:
     BOT_TOKEN = os.environ["BOT_TOKEN"]
 
     DATABASE_URI = os.environ["DATABASE_URI"]
-    DATABASE_NAME = os.environ.get("DATABASE_NAME", "autofilter")
+    DATABASE_NAME = os.environ.get("    "DATABASE_NAME": "autofilter_main",
+    )
 
     ADMINS = _ids("ADMINS")
     DB_CHANNELS = _ids("DB_CHANNELS")
