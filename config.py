@@ -21,7 +21,8 @@ class Config:
     BOT_TOKEN = os.environ["BOT_TOKEN"]
 
     DATABASE_URI = os.environ["DATABASE_URI"]
-    DATABASE_NAME = os.environ.get("'DATABASE_NAME', "yato")
+    # Optional: database.py auto-detects an existing database when this is empty.
+    DATABASE_NAME = os.environ.get("DATABASE_NAME", "").strip()
 
     ADMINS = _ids("ADMINS")
     DB_CHANNELS = _ids("DB_CHANNELS")
