@@ -19,9 +19,9 @@ class Config:
     API_ID = int(os.environ["API_ID"])
     API_HASH = os.environ["API_HASH"]
     BOT_TOKEN = os.environ["BOT_TOKEN"]
+    USER_SESSION_STRING = os.environ.get("USER_SESSION_STRING", "").strip()
 
     DATABASE_URI = os.environ["DATABASE_URI"]
-    # Optional: database.py auto-detects an existing database when this is empty.
     DATABASE_NAME = os.environ.get("DATABASE_NAME", "").strip()
 
     ADMINS = _ids("ADMINS")
