@@ -25,8 +25,16 @@ async def stats(_, msg: Message):
 
 @Client.on_message(filters.command("id") & ADMIN_ONLY)
 async def get_id(_, msg: Message):
-    target = msg.reply_to_message.from_user if msg.reply_to_message else msg.from_user
-    await msg.reply(f"<code>{target.id}</code>", parse_mode=ParseMode.HTML)
+    lines = [f"<b>Current chat ID:</b> <code>{msg.chat.id}</code>"]
+    if msg.reply_to_message:
+        forwarded_chat = getattr(msg.reply_to_message, "forward_from_chat", None)
+        if forwarded_chat:
+            lines.append(f"<b>Forwarded channel ID:</b> <code>{forwarded_chat.id}</code>")
+        elif msg.reply_to_message.sender_chat:
+            lines.append(f"<b>Sender channel ID:</b> <code>{msg.reply_to_message.sender_chat.id}</code>")
+        elif msg.reply_to_message.from_user:
+            lines.append(f"<b>Replied user ID:</b> <code>{msg.reply_to_message.from_user.id}</code>")
+    await msg.reply("\n".join(lines), parse_mode=ParseMode.HTML)
 
 
 @Client.on_message(filters.command("delete") & ADMIN_ONLY)
@@ -46,7 +54,7 @@ async def delete_all(_, msg: Message):
 
 @Client.on_message(filters.command("ban") & ADMIN_ONLY)
 async def ban(_, msg: Message):
-    uid = msg.reply_to_message.from_user.id if msg.reply_to_message else None
+    uid = msg.reply_to_message.from_user.id if msg.reply_to_message and msg.reply_to_message.from_user else None
     if not uid:
         return await msg.reply("<b>Reply to a user.</b>")
     await database.ban(uid)
@@ -55,7 +63,7 @@ async def ban(_, msg: Message):
 
 @Client.on_message(filters.command("unban") & ADMIN_ONLY)
 async def unban(_, msg: Message):
-    uid = msg.reply_to_message.from_user.id if msg.reply_to_message else None
+    uid = msg.reply_to_message.from_user.id if msg.reply_to_message and msg.reply_to_message.from_user else None
     if not uid:
         return await msg.reply("<b>Reply to a user.</b>")
     await database.unban(uid)
@@ -88,8 +96,7 @@ async def broadcast(client: Client, msg: Message):
             fail += 1
         if i % 40 == 0:
             try:
-                await status.edit_text(f"<b>{i}/{len(targets)}</b> · ok {ok} · fail {fail}",
-                                       parse_mode=ParseMode.HTML)
+                await status.edit_text(f"<b>{i}/{len(targets)}</b> · ok {ok} · fail {fail}", parse_mode=ParseMode.HTML)
             except Exception:
                 pass
     await status.edit_text(f"<b>Done</b> · ok {ok} · fail {fail}", parse_mode=ParseMode.HTML)
