@@ -1,0 +1,95 @@
+import asyncio
+
+from pyrogram import Client, filters
+from pyrogram.enums import ParseMode
+from pyrogram.errors import FloodWait
+from pyrogram.types import Message
+
+import database
+from config import Config
+
+ADMIN_ONLY = filters.user(list(Config.ADMINS))
+
+
+@Client.on_message(filters.command("stats") & ADMIN_ONLY)
+async def stats(_, msg: Message):
+    await msg.reply(
+        f"<b>Index</b> <code>{await database.total_files()}</code> files\n"
+        f"<b>Users</b> <code>{await database.total_users()}</code>\n"
+        f"<b>Groups</b> <code>{await database.total_chats()}</code>\n"
+        f"<b>Protect</b> <code>{Config.PROTECT}</code>\n"
+        f"<b>Auto-delete</b> <code>{Config.AUTO_DELETE}s</code>",
+        parse_mode=ParseMode.HTML,
+    )
+
+
+@Client.on_message(filters.command("id") & ADMIN_ONLY)
+async def get_id(_, msg: Message):
+    target = msg.reply_to_message.from_user if msg.reply_to_message else msg.from_user
+    await msg.reply(f"<code>{target.id}</code>", parse_mode=ParseMode.HTML)
+
+
+@Client.on_message(filters.command("delete") & ADMIN_ONLY)
+async def delete_one(_, msg: Message):
+    parts = msg.text.split(maxsplit=1)
+    if len(parts) < 2:
+        return await msg.reply("<b>Usage</b> <code>/delete &lt;file_id&gt;</code>", parse_mode=ParseMode.HTML)
+    ok = await database.delete_file(parts[1].strip())
+    await msg.reply("<b>Deleted</b>" if ok else "<b>Not in index</b>", parse_mode=ParseMode.HTML)
+
+
+@Client.on_message(filters.command("deleteall") & ADMIN_ONLY)
+async def delete_all(_, msg: Message):
+    n = await database.delete_all()
+    await msg.reply(f"<b>Wiped</b> <code>{n}</code> files", parse_mode=ParseMode.HTML)
+
+
+@Client.on_message(filters.command("ban") & ADMIN_ONLY)
+async def ban(_, msg: Message):
+    uid = msg.reply_to_message.from_user.id if msg.reply_to_message else None
+    if not uid:
+        return await msg.reply("<b>Reply to a user.</b>")
+    await database.ban(uid)
+    await msg.reply(f"<b>Banned</b> <code>{uid}</code>", parse_mode=ParseMode.HTML)
+
+
+@Client.on_message(filters.command("unban") & ADMIN_ONLY)
+async def unban(_, msg: Message):
+    uid = msg.reply_to_message.from_user.id if msg.reply_to_message else None
+    if not uid:
+        return await msg.reply("<b>Reply to a user.</b>")
+    await database.unban(uid)
+    await msg.reply(f"<b>Unbanned</b> <code>{uid}</code>", parse_mode=ParseMode.HTML)
+
+
+@Client.on_message(filters.command(["enable", "disable"]) & ADMIN_ONLY)
+async def toggle(_, msg: Message):
+    on = msg.text.startswith("/enable")
+    await database.set_chat(msg.chat.id, on)
+    await msg.reply(f"<b>{'Enabled' if on else 'Disabled'} here.</b>")
+
+
+@Client.on_message(filters.command("broadcast") & ADMIN_ONLY)
+async def broadcast(client: Client, msg: Message):
+    if not msg.reply_to_message:
+        return await msg.reply("<b>Reply to the message to broadcast.</b>")
+
+    targets = await database.all_users() + await database.all_chats()
+    status = await msg.reply(f"<b>Sending to {len(targets)}…</b>", parse_mode=ParseMode.HTML)
+    ok = fail = 0
+    for i, cid in enumerate(targets, 1):
+        try:
+            await msg.reply_to_message.copy(cid)
+            ok += 1
+        except FloodWait as e:
+            await asyncio.sleep(e.value)
+            fail += 1
+        except Exception:
+            fail += 1
+        if i % 40 == 0:
+            try:
+                await status.edit_text(f"<b>{i}/{len(targets)}</b> · ok {ok} · fail {fail}",
+                                       parse_mode=ParseMode.HTML)
+            except Exception:
+                pass
+    await status.edit_text(f"<b>Done</b> · ok {ok} · fail {fail}", parse_mode=ParseMode.HTML)
