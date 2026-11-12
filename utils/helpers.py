@@ -69,15 +69,10 @@ def caption(doc: dict) -> str:
 
 
 def result_keyboard(docs: list[dict], query: str, page: int, total: int) -> InlineKeyboardMarkup:
-    rows, row = [], []
-    for i, d in enumerate(docs, start=page * Config.PER_PAGE + 1):
-        row.append(InlineKeyboardButton(f"{i}", callback_data=f"send:{d['_id']}"))
-        if len(row) == 4:
-            rows.append(row)
-            row = []
-    if row:
-        rows.append(row)
-
+    rows = []
+    for d in docs:
+        name = trim(d.get("name") or "Unnamed file", 60)
+        rows.append([InlineKeyboardButton(name, callback_data=f"send:{d['_id']}")])
     nav = []
     if page > 0:
         nav.append(InlineKeyboardButton("‹ Prev", callback_data=f"page:{page - 1}:{query}"))
@@ -85,9 +80,7 @@ def result_keyboard(docs: list[dict], query: str, page: int, total: int) -> Inli
     nav.append(InlineKeyboardButton(f"{page + 1}/{pages}", callback_data="noop"))
     if page + 1 < pages:
         nav.append(InlineKeyboardButton("Next ›", callback_data=f"page:{page + 1}:{query}"))
-    if nav:
-        rows.append(nav)
-
+    rows.append(nav)
     rows.append([InlineKeyboardButton("✕ Close", callback_data="close")])
     return InlineKeyboardMarkup(rows)
 
