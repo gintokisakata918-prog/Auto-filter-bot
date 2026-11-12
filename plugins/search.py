@@ -20,7 +20,7 @@ def is_search(msg: Message) -> bool:
 
 
 @Client.on_message(filters.private & filters.text & ~filters.command(
-    ["start", "help", "stats", "id", "index", "settings", "broadcast", "delete", "deleteall", "ban", "unban"]))
+    ["start", "help", "stats", "id", "index", "settings", "setphoto", "delphoto", "broadcast", "delete", "deleteall", "ban", "unban"]))
 async def pm_search(client: Client, msg: Message):
     if await database.is_banned(msg.from_user.id):
         return
@@ -41,10 +41,8 @@ async def group_search(client: Client, msg: Message):
 
 async def run_search(client: Client, msg: Message, query: str, page: int):
     docs, total = await database.search(query, page * Config.PER_PAGE, Config.PER_PAGE)
-
     if not docs:
         return await msg.reply(NO_RESULT.format(q=esc(trim(query, 40))), parse_mode=ParseMode.HTML)
-
     head = (
         f"<b>{esc(trim(query, 40))}</b>\n"
         f"<blockquote>{total} match{'es' if total != 1 else ''} · page {page + 1}</blockquote>"
@@ -59,7 +57,6 @@ async def paginate(client: Client, cb: CallbackQuery):
     docs, total = await database.search(query, page * Config.PER_PAGE, Config.PER_PAGE)
     if not docs:
         return await cb.answer("That page is gone", show_alert=True)
-
     head = (
         f"<b>{esc(trim(query, 40))}</b>\n"
         f"<blockquote>{total} match{'es' if total != 1 else ''} · page {page + 1}</blockquote>"
@@ -82,20 +79,18 @@ async def deliver(client: Client, msg: Message, uid: str, reply_to: int | None =
     doc = await database.get_file(uid)
     if not doc:
         return await msg.reply("<b>File is gone.</b> It was removed from the index.")
-
     kb = InlineKeyboardMarkup([[InlineKeyboardButton(
         "Open in PM", url=f"https://t.me/{Config.BOT_USERNAME}?start=file_{uid}")]]) \
         if msg.chat.type != ChatType.PRIVATE and Config.BOT_USERNAME else None
-
+    protect = await database.get_setting("protect_content", Config.PROTECT)
     common = dict(
         caption=caption(doc),
         parse_mode=ParseMode.HTML,
-        protect_content=Config.PROTECT,
+        protect_content=bool(protect),
         reply_markup=kb,
     )
     if reply_to:
         common["reply_to_message_id"] = reply_to
-
     if doc.get("kind") == "video":
         sent = await client.send_video(msg.chat.id, doc["file_id"], **common)
     elif doc.get("kind") == "audio":
@@ -103,7 +98,6 @@ async def deliver(client: Client, msg: Message, uid: str, reply_to: int | None =
     else:
         sent = await client.send_document(msg.chat.id, doc["file_id"],
                                           file_name=doc.get("name"), **common)
-
     if Config.AUTO_DELETE:
         import asyncio
         await asyncio.sleep(Config.AUTO_DELETE)
