@@ -1,22 +1,60 @@
 import time
+import logging
 
 from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo.errors import PyMongoError
 
 from config import Config
 
-client = AsyncIOMotorClient(Config.DATABASE_URI)
-db = client[Config.DATABASE_NAME]
+log = logging.getLogger("autofilter.database")
 
-files = db.files
-users = db.users
-chats = db.chats
-banned = db.banned
+client = AsyncIOMotorClient(Config.DATABASE_URI, serverSelectionTimeoutMS=15000)
+
+# Bind collections after resolving the real database name.
+db = None
+files = users = chats = banned = None
+
+
+async def _resolve_database():
+    """Use configured/URI database, matching existing names without case sensitivity."""
+    configured = Config.DATABASE_NAME.strip() if Config.DATABASE_NAME else ""
+
+    try:
+        default_db = client.get_default_database(default=None)
+    except Exception:
+        default_db = None
+
+    requested = configured or (default_db.name if default_db is not None else "autofilter")
+
+    try:
+        names = await client.list_database_names()
+        existing = next((name for name in names if name.casefold() == requested.casefold()), None)
+        if existing:
+            if existing != requested:
+                log.info("MongoDB database name matched existing case: %s", existing)
+            return existing
+    except PyMongoError as exc:
+        # Some MongoDB users are not allowed to list databases. Fall back to
+        # the configured name or the database embedded in the connection URI.
+        log.warning("Could not list MongoDB databases; using %s (%s)", requested, exc)
+
+    return requested
 
 
 async def ensure_indexes():
+    global db, files, users, chats, banned
+
+    database_name = await _resolve_database()
+    db = client[database_name]
+    files = db.files
+    users = db.users
+    chats = db.chats
+    banned = db.banned
+
     await files.create_index("name_lower")
     await files.create_index([("size", -1)])
     await files.create_index("created_at")
+    log.info("MongoDB connected · database=%s", database_name)
 
 
 async def save_file(doc: dict) -> bool:
@@ -26,7 +64,7 @@ async def save_file(doc: dict) -> bool:
         await files.insert_one(doc)
         return True
     except Exception:
-        return False  # duplicate _id = pehle se indexed
+        return False
 
 
 async def get_file(uid: str) -> dict | None:
@@ -53,7 +91,11 @@ async def total_chats() -> int:
 
 
 async def add_user(uid: int, name: str):
-    await users.update_one({"_id": uid}, {"$set": {"name": name}, "$setOnInsert": {"joined": time.time()}}, upsert=True)
+    await users.update_one(
+        {"_id": uid},
+        {"$set": {"name": name}, "$setOnInsert": {"joined": time.time()}},
+        upsert=True,
+    )
 
 
 async def all_users() -> list[int]:
