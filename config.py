@@ -33,6 +33,6 @@ class Config:
     START_PIC = os.environ.get("START_PIC", "")
 
     PROTECT = _bool("PROTECT", True)
-    AUTO_DELETE = int(os.environ.get("AUTO_DELETE_SEC", "0") or 0)
+    AUTO_DELETE = max(0, int(os.environ.get("AUTO_DELETE_SEC", "600") or 0))
     PER_PAGE = max(1, min(20, int(os.environ.get("RESULTS_PER_PAGE", "8") or 8)))
     MAX_RESULTS = 300
