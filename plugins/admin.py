@@ -18,9 +18,36 @@ async def stats(_, msg: Message):
         f"<b>Users</b> <code>{await database.total_users()}</code>\n"
         f"<b>Groups</b> <code>{await database.total_chats()}</code>\n"
         f"<b>Protect</b> <code>{Config.PROTECT}</code>\n"
-        f"<b>Auto-delete</b> <code>{Config.AUTO_DELETE}s</code>",
+        f"<b>Auto-delete</b> <code>{await database.get_setting('auto_delete_seconds', Config.AUTO_DELETE) or 'OFF'}</code>",
         parse_mode=ParseMode.HTML,
     )
+
+
+@Client.on_message(filters.command("autodelete") & ADMIN_ONLY)
+async def set_auto_delete(_, msg: Message):
+    parts = (msg.text or "").split(maxsplit=1)
+    if len(parts) == 1:
+        current = int(await database.get_setting("auto_delete_seconds", Config.AUTO_DELETE) or 0)
+        state = "OFF" if current == 0 else f"{current} seconds"
+        return await msg.reply(
+            f"<b>Current file auto-delete:</b> <code>{state}</code>\\n"
+            "Set with <code>/autodelete 600</code> (10 minutes).\\n"
+            "Use <code>/autodelete off</code> to disable automatic deletion.\\n"
+            "<i>Minimum: 10 seconds · Maximum: 24 hours.</i>",
+            parse_mode=ParseMode.HTML,
+        )
+    value = parts[1].strip().lower()
+    if value in {"off", "0"}:
+        await database.set_setting("auto_delete_seconds", 0)
+        return await msg.reply("<b>File auto-delete disabled.</b>", parse_mode=ParseMode.HTML)
+    try:
+        seconds = int(value)
+    except ValueError:
+        return await msg.reply("Use <code>/autodelete 600</code> or <code>/autodelete off</code>.", parse_mode=ParseMode.HTML)
+    if not 10 <= seconds <= 86400:
+        return await msg.reply("Time must be between <code>10</code> and <code>86400</code> seconds.", parse_mode=ParseMode.HTML)
+    await database.set_setting("auto_delete_seconds", seconds)
+    await msg.reply(f"<b>File auto-delete set to</b> <code>{seconds}</code> seconds.", parse_mode=ParseMode.HTML)
 
 
 @Client.on_message(filters.command("id") & ADMIN_ONLY)
