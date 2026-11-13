@@ -52,8 +52,6 @@ async def group_search(client: Client, msg: Message):
         return
     if not is_search(msg):
         return
-    if not await database.chat_enabled(msg.chat.id):
-        return
     await run_search(client, msg, msg.text.strip(), 0)
 
 
