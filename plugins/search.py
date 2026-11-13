@@ -34,7 +34,7 @@ def is_search(msg: Message) -> bool:
 
 
 @Client.on_message(filters.private & filters.text & ~filters.command(
-    ["start", "help", "stats", "id", "index", "settings", "setphoto", "delphoto", "broadcast", "delete", "deleteall", "ban", "unban"]))
+    ["start", "help", "stats", "id", "index", "settings", "setphoto", "delphoto", "broadcast", "delete", "deleteall", "ban", "unban", "pmsearch", "pm_search", "groupsearch", "group_search"]))
 async def pm_search(client: Client, msg: Message):
     if not await database.get_setting("pm_search", True):
         return
@@ -46,7 +46,7 @@ async def pm_search(client: Client, msg: Message):
     await run_search(client, msg, msg.text.strip(), 0)
 
 
-@Client.on_message(filters.group & filters.text & ~filters.via_bot & ~filters.service)
+@Client.on_message(filters.group & filters.text & ~filters.via_bot & ~filters.service & ~filters.command(["pmsearch", "pm_search", "groupsearch", "group_search"]))
 async def group_search(client: Client, msg: Message):
     if not await database.get_setting("group_search", True):
         return
