@@ -65,7 +65,10 @@ async def run_search(client: Client, msg: Message, query: str, page: int):
         f"<b>{esc(trim(query, 40))}</b>\n"
         f"<blockquote>{total} match{'es' if total != 1 else ''} · page {page + 1}</blockquote>"
     )
-    sent = await msg.reply(head, reply_markup=result_keyboard(docs, query, page, total), parse_mode=ParseMode.HTML)
+    sent = await msg.reply(head, reply_markup=result_keyboard(
+        docs, query, page, total,
+        Config.BOT_USERNAME if msg.chat.type != ChatType.PRIVATE else None,
+    ), parse_mode=ParseMode.HTML)
     _schedule_delete(sent, RESULTS_TTL)
 
 
@@ -81,8 +84,14 @@ async def paginate(client: Client, cb: CallbackQuery):
         f"<blockquote>{total} match{'es' if total != 1 else ''} · page {page + 1}</blockquote>"
     )
     try:
-        await cb.message.edit_text(head, reply_markup=result_keyboard(docs, query, page, total),
-                                   parse_mode=ParseMode.HTML)
+        await cb.message.edit_text(
+            head,
+            reply_markup=result_keyboard(
+                docs, query, page, total,
+                Config.BOT_USERNAME if cb.message.chat.type != ChatType.PRIVATE else None,
+            ),
+            parse_mode=ParseMode.HTML,
+        )
         _schedule_delete(cb.message, RESULTS_TTL)
     except MessageNotModified:
         pass
@@ -128,7 +137,7 @@ async def deliver(
         else:
             duration = f"{auto_delete} second(s)"
         warning = (
-            "\\n\\n⚠️ <b>Temporary file</b>\\n"
+            "\n\n⚠️ <b>Temporary file</b>\n"
             f"This file will be automatically deleted in {duration}. "
             "Please save it to your device before the time expires."
         )
