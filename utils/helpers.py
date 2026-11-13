@@ -66,11 +66,21 @@ def caption(doc: dict) -> str:
     return "\n".join(lines)
 
 
-def result_keyboard(docs: list[dict], query: str, page: int, total: int) -> InlineKeyboardMarkup:
+def result_keyboard(
+    docs: list[dict],
+    query: str,
+    page: int,
+    total: int,
+    bot_username: str | None = None,
+) -> InlineKeyboardMarkup:
     rows = []
     for d in docs:
         name = trim(d.get("name") or "Unnamed file", 60)
-        rows.append([InlineKeyboardButton(name, callback_data=f"send:{d['_id']}")])
+        if bot_username:
+            url = f"https://t.me/{bot_username}?start=file_{d['_id']}"
+            rows.append([InlineKeyboardButton(name, url=url)])
+        else:
+            rows.append([InlineKeyboardButton(name, callback_data=f"send:{d['_id']}")])
     nav = []
     if page > 0:
         nav.append(InlineKeyboardButton("‹ Prev", callback_data=f"page:{page - 1}:{query}"))
