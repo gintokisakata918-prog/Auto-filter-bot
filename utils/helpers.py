@@ -63,8 +63,6 @@ def caption(doc: dict) -> str:
     if t["episode"]:
         lines.append(f"◦ <b>Episode</b> — <code>{t['episode']}</code>")
     lines.append(f"◦ <b>Source</b> — {esc(doc.get('channel_title') or 'channel')}")
-    if Config.AUTO_DELETE:
-        lines.append(f"\n<i>Auto-delete in {Config.AUTO_DELETE}s</i>")
     return "\n".join(lines)
 
 
