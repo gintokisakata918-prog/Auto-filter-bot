@@ -1,3 +1,4 @@
+import asyncio
 from pyrogram import Client, filters
 from pyrogram.enums import ChatType, ParseMode
 from pyrogram.errors import MessageNotModified
@@ -8,11 +9,24 @@ from config import Config
 from utils.fsub import keyboard as fsub_keyboard
 from utils.helpers import caption, esc, result_keyboard, size, trim
 
+RESULTS_TTL = 300
 NO_RESULT = (
     "<b>Nothing found</b>\n"
     "<blockquote>No file matches <code>{q}</code>.</blockquote>\n"
     "<i>Try fewer words, or check the spelling.</i>"
 )
+
+
+async def _delete_later(message: Message, seconds: int):
+    await asyncio.sleep(seconds)
+    try:
+        await message.delete()
+    except Exception:
+        pass
+
+
+def _schedule_delete(message: Message, seconds: int):
+    asyncio.create_task(_delete_later(message, seconds))
 
 
 def is_search(msg: Message) -> bool:
@@ -42,12 +56,15 @@ async def group_search(client: Client, msg: Message):
 async def run_search(client: Client, msg: Message, query: str, page: int):
     docs, total = await database.search(query, page * Config.PER_PAGE, Config.PER_PAGE)
     if not docs:
-        return await msg.reply(NO_RESULT.format(q=esc(trim(query, 40))), parse_mode=ParseMode.HTML)
+        sent = await msg.reply(NO_RESULT.format(q=esc(trim(query, 40))), parse_mode=ParseMode.HTML)
+        _schedule_delete(sent, RESULTS_TTL)
+        return
     head = (
         f"<b>{esc(trim(query, 40))}</b>\n"
         f"<blockquote>{total} match{'es' if total != 1 else ''} · page {page + 1}</blockquote>"
     )
-    await msg.reply(head, reply_markup=result_keyboard(docs, query, page, total), parse_mode=ParseMode.HTML)
+    sent = await msg.reply(head, reply_markup=result_keyboard(docs, query, page, total), parse_mode=ParseMode.HTML)
+    _schedule_delete(sent, RESULTS_TTL)
 
 
 @Client.on_callback_query(filters.regex(r"^page:"))
@@ -64,6 +81,7 @@ async def paginate(client: Client, cb: CallbackQuery):
     try:
         await cb.message.edit_text(head, reply_markup=result_keyboard(docs, query, page, total),
                                    parse_mode=ParseMode.HTML)
+        _schedule_delete(cb.message, RESULTS_TTL)
     except MessageNotModified:
         pass
     await cb.answer()
@@ -83,8 +101,13 @@ async def deliver(client: Client, msg: Message, uid: str, reply_to: int | None =
         "Open in PM", url=f"https://t.me/{Config.BOT_USERNAME}?start=file_{uid}")]]) \
         if msg.chat.type != ChatType.PRIVATE and Config.BOT_USERNAME else None
     protect = await database.get_setting("protect_content", Config.PROTECT)
+    warning = (
+        "\n\n⚠️ <b>Temporary file</b>\n"
+        "This file will be automatically deleted in 10 minutes. "
+        "Please save it to your device before the time expires."
+    )
     common = dict(
-        caption=caption(doc),
+        caption=caption(doc) + warning,
         parse_mode=ParseMode.HTML,
         protect_content=bool(protect),
         reply_markup=kb,
@@ -99,9 +122,4 @@ async def deliver(client: Client, msg: Message, uid: str, reply_to: int | None =
         sent = await client.send_document(msg.chat.id, doc["file_id"],
                                           file_name=doc.get("name"), **common)
     if Config.AUTO_DELETE:
-        import asyncio
-        await asyncio.sleep(Config.AUTO_DELETE)
-        try:
-            await sent.delete()
-        except Exception:
-            pass
+        _schedule_delete(sent, Config.AUTO_DELETE)
