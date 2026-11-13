@@ -91,17 +91,33 @@ async def paginate(client: Client, cb: CallbackQuery):
 
 @Client.on_callback_query(filters.regex(r"^send:"))
 async def send_file(client: Client, cb: CallbackQuery):
-    await cb.answer("Sending…")
-    await deliver(client, cb.message, cb.data.split(":", 1)[1], reply_to=cb.message.id)
+    uid = cb.data.split(":", 1)[1]
+    is_group = cb.message.chat.type != ChatType.PRIVATE
+    destination = cb.from_user.id if is_group else cb.message.chat.id
+    try:
+        await deliver(client, cb.message, uid, target_chat_id=destination)
+        await cb.answer("File sent to your PM. Check your private chat.")
+    except Exception:
+        if is_group:
+            await cb.answer("I couldn't DM you. Open the bot and press START first, then try again.", show_alert=True)
+        else:
+            await cb.answer("Couldn't send this file. Please try again.", show_alert=True)
 
 
-async def deliver(client: Client, msg: Message, uid: str, reply_to: int | None = None):
+async def deliver(
+    client: Client,
+    msg: Message,
+    uid: str,
+    reply_to: int | None = None,
+    target_chat_id: int | None = None,
+):
     doc = await database.get_file(uid)
     if not doc:
         return await msg.reply("<b>File is gone.</b> It was removed from the index.")
+    destination = target_chat_id or msg.chat.id
     kb = InlineKeyboardMarkup([[InlineKeyboardButton(
         "Open in PM", url=f"https://t.me/{Config.BOT_USERNAME}?start=file_{uid}")]]) \
-        if msg.chat.type != ChatType.PRIVATE and Config.BOT_USERNAME else None
+        if msg.chat.type != ChatType.PRIVATE and destination == msg.chat.id and Config.BOT_USERNAME else None
     protect = await database.get_setting("protect_content", Config.PROTECT)
     warning = (
         "\n\n⚠️ <b>Temporary file</b>\n"
@@ -114,14 +130,14 @@ async def deliver(client: Client, msg: Message, uid: str, reply_to: int | None =
         protect_content=bool(protect),
         reply_markup=kb,
     )
-    if reply_to:
+    if reply_to and destination == msg.chat.id:
         common["reply_to_message_id"] = reply_to
     if doc.get("kind") == "video":
-        sent = await client.send_video(msg.chat.id, doc["file_id"], **common)
+        sent = await client.send_video(destination, doc["file_id"], **common)
     elif doc.get("kind") == "audio":
-        sent = await client.send_audio(msg.chat.id, doc["file_id"], **common)
+        sent = await client.send_audio(destination, doc["file_id"], **common)
     else:
-        sent = await client.send_document(msg.chat.id, doc["file_id"],
+        sent = await client.send_document(destination, doc["file_id"],
                                           file_name=doc.get("name"), **common)
     if Config.AUTO_DELETE:
         _schedule_delete(sent, Config.AUTO_DELETE)
