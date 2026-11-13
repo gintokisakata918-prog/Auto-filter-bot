@@ -36,6 +36,8 @@ def is_search(msg: Message) -> bool:
 @Client.on_message(filters.private & filters.text & ~filters.command(
     ["start", "help", "stats", "id", "index", "settings", "setphoto", "delphoto", "broadcast", "delete", "deleteall", "ban", "unban"]))
 async def pm_search(client: Client, msg: Message):
+    if not await database.get_setting("pm_search", True):
+        return
     if await database.is_banned(msg.from_user.id):
         return
     kb = await fsub_keyboard(client, msg.from_user.id)
@@ -46,6 +48,8 @@ async def pm_search(client: Client, msg: Message):
 
 @Client.on_message(filters.group & filters.text & ~filters.via_bot & ~filters.service)
 async def group_search(client: Client, msg: Message):
+    if not await database.get_setting("group_search", True):
+        return
     if not is_search(msg):
         return
     if not await database.chat_enabled(msg.chat.id):
