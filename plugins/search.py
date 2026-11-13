@@ -34,7 +34,7 @@ def is_search(msg: Message) -> bool:
 
 
 @Client.on_message(filters.private & filters.text & ~filters.command(
-    ["start", "help", "stats", "id", "index", "settings", "setphoto", "delphoto", "broadcast", "delete", "deleteall", "ban", "unban", "pmsearch", "pm_search", "groupsearch", "group_search"]))
+    ["start", "help", "stats", "id", "index", "settings", "setphoto", "delphoto", "broadcast", "delete", "deleteall", "ban", "unban", "pmsearch", "pm_search", "groupsearch", "group_search", "autodelete"]))
 async def pm_search(client: Client, msg: Message):
     if not await database.get_setting("pm_search", True):
         return
@@ -46,7 +46,7 @@ async def pm_search(client: Client, msg: Message):
     await run_search(client, msg, msg.text.strip(), 0)
 
 
-@Client.on_message(filters.group & filters.text & ~filters.via_bot & ~filters.service & ~filters.command(["pmsearch", "pm_search", "groupsearch", "group_search"]))
+@Client.on_message(filters.group & filters.text & ~filters.via_bot & ~filters.service & ~filters.command(["pmsearch", "pm_search", "groupsearch", "group_search", "autodelete"]))
 async def group_search(client: Client, msg: Message):
     if not await database.get_setting("group_search", True):
         return
@@ -119,11 +119,21 @@ async def deliver(
         "Open in PM", url=f"https://t.me/{Config.BOT_USERNAME}?start=file_{uid}")]]) \
         if msg.chat.type != ChatType.PRIVATE and destination == msg.chat.id and Config.BOT_USERNAME else None
     protect = await database.get_setting("protect_content", Config.PROTECT)
-    warning = (
-        "\n\n⚠️ <b>Temporary file</b>\n"
-        "This file will be automatically deleted in 10 minutes. "
-        "Please save it to your device before the time expires."
-    )
+    auto_delete = int(await database.get_setting("auto_delete_seconds", Config.AUTO_DELETE) or 0)
+    if auto_delete > 0:
+        if auto_delete % 3600 == 0:
+            duration = f"{auto_delete // 3600} hour(s)"
+        elif auto_delete % 60 == 0:
+            duration = f"{auto_delete // 60} minute(s)"
+        else:
+            duration = f"{auto_delete} second(s)"
+        warning = (
+            "\\n\\n⚠️ <b>Temporary file</b>\\n"
+            f"This file will be automatically deleted in {duration}. "
+            "Please save it to your device before the time expires."
+        )
+    else:
+        warning = ""
     common = dict(
         caption=caption(doc) + warning,
         parse_mode=ParseMode.HTML,
@@ -139,5 +149,5 @@ async def deliver(
     else:
         sent = await client.send_document(destination, doc["file_id"],
                                           file_name=doc.get("name"), **common)
-    if Config.AUTO_DELETE:
-        _schedule_delete(sent, Config.AUTO_DELETE)
+    if auto_delete > 0:
+        _schedule_delete(sent, auto_delete)
