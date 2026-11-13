@@ -1,5 +1,6 @@
 import time
 import logging
+import re
 
 from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo.errors import PyMongoError
@@ -66,7 +67,13 @@ async def get_file(uid: str) -> dict | None:
 
 
 async def search(query: str, offset: int = 0, limit: int = 8) -> tuple[list[dict], int]:
-    rx = {"name_lower": {"$regex": query.lower().strip(), "$options": "i"}}
+    # Treat spaces, dots, underscores, hyphens and other separators equally.
+    # Example: "Spooky in Love" matches "Spooky.in.Love" and "Spooky_in_Love".
+    tokens = re.findall(r"[^\\W_]+", (query or "").lower(), flags=re.UNICODE)
+    if not tokens:
+        return [], 0
+    pattern = r"[\\W_]*".join(re.escape(token) for token in tokens)
+    rx = {"name_lower": {"$regex": pattern, "$options": "i"}}
     total = await files.count_documents(rx)
     cursor = files.find(rx).sort("created_at", -1).skip(offset).limit(limit)
     return [d async for d in cursor], total
