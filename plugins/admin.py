@@ -77,6 +77,37 @@ async def toggle(_, msg: Message):
     await msg.reply(f"<b>{'Enabled' if on else 'Disabled'} here.</b>")
 
 
+@Client.on_message(filters.command(["pmsearch", "pm_search"]) & ADMIN_ONLY)
+async def toggle_pm_search(_, msg: Message):
+    parts = (msg.text or "").split(maxsplit=1)
+    if len(parts) == 1 or parts[1].strip().lower() not in {"on", "off"}:
+        current = bool(await database.get_setting("pm_search", True))
+        return await msg.reply(
+            f"<b>PM search:</b> <code>{'ON' if current else 'OFF'}</code>\n"
+            "Use <code>/pmsearch on</code> or <code>/pmsearch off</code>.",
+            parse_mode=ParseMode.HTML,
+        )
+    enabled = parts[1].strip().lower() == "on"
+    await database.set_setting("pm_search", enabled)
+    await msg.reply(f"<b>PM search {'enabled' if enabled else 'disabled'}.</b>", parse_mode=ParseMode.HTML)
+
+
+@Client.on_message(filters.command(["groupsearch", "group_search"]) & ADMIN_ONLY)
+async def toggle_group_search(_, msg: Message):
+    parts = (msg.text or "").split(maxsplit=1)
+    if len(parts) == 1 or parts[1].strip().lower() not in {"on", "off"}:
+        current = bool(await database.get_setting("group_search", True))
+        return await msg.reply(
+            f"<b>Group search:</b> <code>{'ON' if current else 'OFF'}</code>\n"
+            "Use <code>/groupsearch on</code> or <code>/groupsearch off</code>.\n"
+            "<i>Individual groups must also be enabled with /enable.</i>",
+            parse_mode=ParseMode.HTML,
+        )
+    enabled = parts[1].strip().lower() == "on"
+    await database.set_setting("group_search", enabled)
+    await msg.reply(f"<b>Group search {'enabled' if enabled else 'disabled'} globally.</b>", parse_mode=ParseMode.HTML)
+
+
 @Client.on_message(filters.command("broadcast") & ADMIN_ONLY)
 async def broadcast(client: Client, msg: Message):
     if not msg.reply_to_message:
