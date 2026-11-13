@@ -100,7 +100,7 @@ async def toggle_group_search(_, msg: Message):
         return await msg.reply(
             f"<b>Group search:</b> <code>{'ON' if current else 'OFF'}</code>\n"
             "Use <code>/groupsearch on</code> or <code>/groupsearch off</code>.\n"
-            "<i>Individual groups must also be enabled with /enable.</i>",
+            "<i>ON enables text search in every group where the bot can read messages.</i>",
             parse_mode=ParseMode.HTML,
         )
     enabled = parts[1].strip().lower() == "on"
